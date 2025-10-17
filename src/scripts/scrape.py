@@ -26,10 +26,14 @@ from lrytas import Scraper
 @click.option(
     "--headless", type=bool, default=True, help="Run the scraper in headless mode"
 )
-def main(dataset_path: Path, max_articles: int, headless: bool) -> None:
+@click.option("--debug", is_flag=True, default=False, help="Enable debug mode")
+def main(dataset_path: Path, max_articles: int, headless: bool, debug: bool) -> None:
     """Scrape articles from lrytas.lt website."""
     with Scraper(
-        dataset_path=dataset_path, max_articles=max_articles, headless=headless
+        dataset_path=dataset_path,
+        max_articles=max_articles,
+        headless=headless,
+        debug=debug,
     ) as scraper:
         scraper.scrape()
 

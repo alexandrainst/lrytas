@@ -7,6 +7,7 @@ from pathlib import Path
 
 import jsonlines
 import requests
+import tldextract
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -14,6 +15,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from wordfreq import top_n_list
+
+# random.seed(42)
 
 logging.basicConfig(
     filename="scraper.log",
@@ -43,14 +46,19 @@ class Scraper:
     """Scrape articles from lrytas.lt website."""
 
     def __init__(
-        self, dataset_path: Path, max_articles: int, headless: bool = True
+        self,
+        dataset_path: Path,
+        max_articles: int,
+        headless: bool = True,
+        debug: bool = False,
     ) -> None:
         """Initialize the Scraper."""
         self.base_url = "https://www.lrytas.lt/search?q={}"
 
         self._setup_chrome_options(headless=headless)
         self.driver: webdriver.Chrome | None = None
-
+        self.cookie_button_clicked = False
+        self.debug = debug
         self.session = requests.Session()
         self.session.headers.update(HEADERS)
 
@@ -109,19 +117,21 @@ class Scraper:
             )
             # Click the button
             button.click()
+            logger.info("Clicked the 'SUTINKU' button")
         except Exception as e:
-            print(f"An error occurred while clicking the button: {e}")
+            logger.warning(f"An error occurred while clicking the button: {e}")
 
     def _get_article_urls(self, query: str) -> list[str] | str:
         """Get article URLs by query."""
         url = self.base_url.format(query)
-        self._short_sleep()
 
         if self.driver is None:
             raise ValueError("Driver is not initialized")
         self.driver.get(url)
-
-        self._click_cookie_button()
+        self._short_sleep()
+        if not self.cookie_button_clicked:
+            self._click_cookie_button()
+            self.cookie_button_clicked = True
 
         soup = BeautifulSoup(self.driver.page_source, "html.parser")
 
@@ -131,7 +141,8 @@ class Scraper:
             a_tag = h3.find("a")
             if a_tag and "href" in a_tag.attrs:
                 link = a_tag.get("href")
-                if not link.startswith("https://www.lrytas.lt"):
+                domain = tldextract.extract(link).domain
+                if not domain == "lrytas":
                     article_url = "https://www.lrytas.lt" + link
                 else:
                     article_url = link
@@ -232,12 +243,14 @@ class Scraper:
                 self.dataset_length += 1
 
     def _short_sleep(self) -> None:
-        # time.sleep(random.uniform(0.1, 0.15))
-        time.sleep(random.uniform(30, 60))
+        time.sleep(random.uniform(0.1, 0.15)) if self.debug else time.sleep(
+            random.uniform(30, 60)
+        )
 
     def _long_sleep(self) -> None:
-        # time.sleep(random.uniform(0.1, 0.15))
-        time.sleep(random.uniform(300, 420))
+        time.sleep(random.uniform(0.1, 0.15)) if self.debug else time.sleep(
+            random.uniform(300, 420)
+        )
 
     def _setup_chrome_options(self, headless: bool) -> None:
         """Setup Chrome options."""
